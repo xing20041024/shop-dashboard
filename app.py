@@ -3,43 +3,48 @@ import pandas as pd
 
 st.set_page_config(page_title="小超市经营分析系统", layout="wide")
 
-st.title("🛒 小超市经营分析系统")
+st.title("🛒 小超市经营分析系统（稳定版）")
 
 uploaded_file = st.file_uploader("上传微信账单Excel", type=["xlsx"])
 
 if uploaded_file:
 
-    # =========================
-    # 1. 读取数据（稳定版）
-    # =========================
+    # ======================
+    # 1. 读取数据（稳）
+    # ======================
     df = pd.read_excel(uploaded_file, skiprows=17)
 
-    st.success("文件上传成功")
+    st.success("上传成功")
 
-    # 清理列名（防止空格/异常）
+    # 清理列名
     df.columns = df.columns.astype(str).str.strip()
 
-    st.write("📌 数据列名：", df.columns)
-
-    # =========================
-    # 2. 自动识别关键列
-    # =========================
+    # ======================
+    # 2. 自动识别列
+    # ======================
     amount_col = [c for c in df.columns if "金额" in c][0]
     time_col = [c for c in df.columns if "时间" in c][0]
     type_col = [c for c in df.columns if "收/支" in c][0]
 
-    # =========================
-    # 3. 数据清洗
-    # =========================
+    # ======================
+    # 3. 数据清洗（关键！）
+    # ======================
+    df = df.dropna(subset=[amount_col, time_col, type_col])
+
     df = df[df[type_col] == "收入"]
 
-    df[time_col] = pd.to_datetime(df[time_col])
+    df[amount_col] = pd.to_numeric(df[amount_col], errors="coerce")
+    df = df.dropna(subset=[amount_col])
+
+    df[time_col] = pd.to_datetime(df[time_col], errors="coerce")
+    df = df.dropna(subset=[time_col])
+
     df["日期"] = df[time_col].dt.date
     df["小时"] = df[time_col].dt.hour
 
-    # =========================
+    # ======================
     # 4. 核心指标
-    # =========================
+    # ======================
     total_income = df[amount_col].sum()
 
     daily = df.groupby("日期")[amount_col].sum().reset_index()
@@ -57,29 +62,31 @@ if uploaded_file:
 
     st.divider()
 
-    # =========================
+    # ======================
     # 5. 趋势图
-    # =========================
-    st.subheader("📈 每日营业额趋势")
+    # ======================
+    st.subheader("📈 每日营业额")
+
     st.line_chart(daily.set_index("日期")[amount_col])
 
     st.divider()
 
-    # =========================
+    # ======================
     # 6. 小时分析
-    # =========================
-    st.subheader("🕒 每小时收入分布")
+    # ======================
+    st.subheader("🕒 每小时收入")
 
     hourly = df.groupby("小时")[amount_col].sum()
     st.bar_chart(hourly)
 
     st.divider()
 
-    # =========================
-    # 7. 明细
-    # =========================
+    # ======================
+    # 7. 明细（稳定展示）
+    # ======================
     st.subheader("📋 最近交易")
 
-    st.dataframe(
-        df.sort_values(time_col, ascending=False).head(20)
-    )
+    safe_df = df[[time_col, amount_col, type_col]].copy()
+    safe_df = safe_df.sort_values(time_col, ascending=False).head(20)
+
+    st.dataframe(safe_df.astype(str))
